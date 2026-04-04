@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { TrackingModule } from '../tracking/tracking.module.js';
+import { GraphHopperModule } from '../graphhopper/graphhopper.module.js';
 import { TenantsModule } from '../tenants/tenants.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { TrucksModule } from '../trucks/trucks.module.js';
@@ -35,6 +36,7 @@ import appConfig from './app.config.js';
     }),
     AuthModule,
     TrackingModule,
+    GraphHopperModule,
     TenantsModule,
     UsersModule,
     TrucksModule,

@@ -43,6 +43,7 @@ AppModule
 ├── TripsModule         → Trip execution; depends on Jobs, Trucks, Users, Tracking
 ├── TrackingModule      → Socket.IO WebSocket gateway for real-time GPS
 ├── GeocodingModule     → OpenCage API integration
+├── GraphHopperModule   → GraphHopper routing API (route, distance_m, duration_s)
 └── EmailModule         → Nodemailer (Mailtrap in dev)
 ```
 
@@ -69,6 +70,13 @@ HTTP Request → JwtAuthGuard (global) → RolesGuard (global) → Controller �
 - Geometry columns use SRID 4326 (WGS84). Type `Point` for locations, `LineString` for routes.
 - Input uses `GeoPointDto` (`{ longitude, latitude }`); stored internally as GeoJSON `{ type: 'Point', coordinates: [lon, lat] }`.
 - Spatial indexes on `delivery_point`, `current_location`, and `route` columns.
+
+**GraphHopper**
+- `GraphHopperService.getRoute(origin, destination, profile)` returns `{ route: LineString, distance_m, duration_s }`
+- Called automatically on `POST /trips/create` using `job.origin_point`, `job.delivery_point`, and `truck.gh_profile`
+- `estimated_arrival` is computed as `now + duration_s`. If GH is unavailable the trip is still created without route data.
+- Env vars: `GRAPHHOPPER_BASE_URL`, `GRAPHHOPPER_API_KEY`
+- Uses `URLSearchParams` for serialization — GH requires repeated `point=lat,lon` params that axios default array serialization breaks.
 
 **WebSocket Tracking**
 - `TrackingGateway` uses Socket.IO rooms keyed by `public_tracking_token`.
