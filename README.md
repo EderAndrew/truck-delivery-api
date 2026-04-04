@@ -6,12 +6,14 @@ API REST multi-tenant para gerenciamento de entregas de cimento e logística de 
 
 ## Propósito
 
-A API serve como backend de uma plataforma SaaS voltada para empresas de transporte e entrega de cimento. Cada empresa (tenant) pode gerenciar:
+A API serve como backend de uma plataforma SaaS voltada para empresas de transporte e entrega de cimento. O sistema calcula rotas seguras para caminhões de carga pesada via **GraphHopper**, levando em conta restrições de peso, tipo de veículo e minimização de riscos de acidentes.
+
+Cada empresa (tenant) pode gerenciar:
 
 - Sua frota de caminhões
 - Seus motoristas e administradores
 - Pedidos de entrega (jobs)
-- Viagens em andamento com rastreamento GPS em tempo real
+- Viagens com roteamento automático e rastreamento GPS em tempo real
 
 ---
 
@@ -23,9 +25,11 @@ A API serve como backend de uma plataforma SaaS voltada para empresas de transpo
 | TypeORM | ORM |
 | PostgreSQL | Banco de dados relacional |
 | PostGIS | Dados geográficos (pontos, rotas) |
+| GraphHopper API | Cálculo de rotas seguras para veículos pesados |
 | Socket.IO | Rastreamento em tempo real via WebSocket |
 | Bcrypt | Hash de senhas |
 | Nodemailer | Envio de e-mails (verificação) |
+| OpenCage API | Geocodificação de endereços |
 
 ---
 
@@ -46,6 +50,8 @@ Empresas que utilizam a plataforma. É a entidade raiz — todos os outros dados
 | `address_city` | varchar | Cidade |
 | `address_state` | varchar | Estado |
 | `address_zip` | varchar | CEP |
+| `address_country` | varchar | País |
+| `origin_point` | geometry (Point, SRID 4326) | Localização da empresa (GPS) |
 | `is_active` | boolean | Tenant ativo ou não |
 | `created_at` | timestamp | Data de criação |
 | `updated_at` | timestamp | Data de atualização |
@@ -61,10 +67,11 @@ Funcionários do tenant. Podem ser administradores ou motoristas.
 | `tenant_id` | UUID (FK → tenants) | Empresa do usuário |
 | `name` | varchar | Nome completo |
 | `email` | varchar | E-mail |
-| `password_hash` | varchar | Senha hasheada (bcrypt) |
-| `role` | enum | `ADMIN` ou `DRIVER` |
+| `password_hash` | varchar | Senha hasheada (bcrypt) — `select: false` |
+| `role` | enum | `MASTER`, `ADMIN`, `USER`, `DRIVER` |
 | `email_verified` | boolean | E-mail verificado |
-| `email_verification_token` | varchar | Token de verificação |
+| `email_verification_token` | varchar | Token de verificação — `select: false` |
+| `photo` | varchar | URL da foto |
 | `is_active` | boolean | Usuário ativo ou não |
 | `created_at` | timestamp | Data de criação |
 | `updated_at` | timestamp | Data de atualização |
@@ -82,7 +89,7 @@ Veículos da frota do tenant.
 | `tenant_id` | UUID (FK → tenants) | Empresa do caminhão |
 | `plate` | varchar | Placa do veículo |
 | `truck_type` | varchar | Tipo (ex: basculante, betoneira) |
-| `gh_profile` | varchar | Perfil de rota/GeoHub |
+| `gh_profile` | varchar | Perfil de roteamento GraphHopper (ex: `truck`, `small_truck`) |
 | `max_weight_kg` | integer | Capacidade máxima em kg |
 | `status` | enum | `AVAILABLE`, `ON_TRIP`, `IN_MAINTENANCE` |
 | `created_at` | timestamp | Data de criação |
@@ -101,6 +108,12 @@ Pedidos de entrega com origem e destino geográfico.
 | `tenant_id` | UUID (FK → tenants) | Empresa responsável |
 | `customer_name` | varchar | Nome do cliente |
 | `customer_phone` | varchar | Telefone do cliente |
+| `address_street` | varchar | Logradouro de entrega |
+| `address_number` | varchar | Número |
+| `address_city` | varchar | Cidade |
+| `address_state` | varchar | Estado |
+| `address_zip` | varchar | CEP |
+| `address_country` | varchar | País |
 | `origin_point` | geometry (Point, SRID 4326) | Ponto de origem (GPS) |
 | `delivery_point` | geometry (Point, SRID 4326) | Ponto de entrega (GPS) |
 | `volume_m3` | numeric | Volume em metros cúbicos |
@@ -112,7 +125,7 @@ Pedidos de entrega com origem e destino geográfico.
 ---
 
 ### `trips`
-Execução real de um job. Liga motorista, caminhão e pedido, e registra o trajeto GPS.
+Execução real de um job. Liga motorista, caminhão e pedido. A rota é calculada automaticamente pelo GraphHopper no momento da criação.
 
 | Coluna | Tipo | Descrição |
 |---|---|---|
@@ -121,15 +134,15 @@ Execução real de um job. Liga motorista, caminhão e pedido, e registra o traj
 | `job_id` | UUID (FK → jobs) | Job sendo executado |
 | `truck_id` | UUID (FK → trucks) | Caminhão utilizado |
 | `driver_id` | UUID (FK → users) | Motorista responsável |
-| `route` | geometry (LineString, SRID 4326) | Trajeto completo (GPS) |
+| `route` | geometry (LineString, SRID 4326) | Rota calculada pelo GraphHopper |
 | `current_location` | geometry (Point, SRID 4326) | Localização atual em tempo real |
 | `last_location_update` | timestamp | Última atualização de localização |
-| `estimated_arrival` | timestamp | ETA estimado |
-| `distance_m` | numeric | Distância total em metros |
-| `duration_s` | integer | Duração estimada em segundos |
+| `estimated_arrival` | timestamp | ETA calculado pelo GraphHopper |
+| `distance_m` | numeric | Distância total em metros (GraphHopper) |
+| `duration_s` | integer | Duração estimada em segundos (GraphHopper) |
 | `start_time` | timestamp | Início da viagem |
 | `end_time` | timestamp | Fim da viagem |
-| `public_tracking_token` | varchar (unique) | Token público para rastreamento sem autenticação |
+| `public_tracking_token` | varchar (unique) | Token para rastreamento público sem autenticação |
 | `status` | enum | `PLANNED`, `STARTED`, `COMPLETED`, `CANCELED` |
 | `created_at` | timestamp | Data de criação |
 | `updated_at` | timestamp | Data de atualização |
@@ -138,44 +151,22 @@ Execução real de um job. Liga motorista, caminhão e pedido, e registra o traj
 
 ## Arquitetura de Módulos
 
-O projeto segue a arquitetura modular do NestJS. Cada módulo possui seu próprio controller, service, entities e DTOs.
-
 ```
 src/
 ├── main.ts                  # Entry point da aplicação
 ├── app/                     # Módulo raiz (bootstrap, config global)
-├── auth/                    # Autenticação e autorização
-│   ├── config/              # Configuração do JWT
-│   ├── decorators/          # @CurrentUser, @Roles, @Public, @GetUser
-│   ├── dto/                 # LoginDto
-│   └── interfaces/          # JwtPayload
-├── common/                  # Código compartilhado entre módulos
-│   ├── dto/                 # GeoPointDto
-│   ├── enums/               # JobStatus, TruckStatus, TripStatus, Role
-│   └── types/               # Tipos geoespaciais e de usuário
+├── auth/                    # Autenticação JWT, guards, decorators
+├── common/                  # DTOs, enums e tipos compartilhados
 ├── tenants/                 # Gestão de empresas (multi-tenancy)
 ├── users/                   # Gestão de usuários (admin e motoristas)
 ├── trucks/                  # Gestão da frota de caminhões
 ├── jobs/                    # Pedidos de entrega
 ├── trips/                   # Viagens (execução dos jobs)
 ├── tracking/                # Rastreamento GPS em tempo real (WebSocket)
-├── email/                   # Serviço de envio de e-mails (Nodemailer)
-├── geocoding/               # Conversão de endereços em coordenadas
-└── types/                   # Extensões de tipos globais (express.d.ts)
+├── graphhopper/             # Integração com GraphHopper API (roteamento)
+├── geocoding/               # Geocodificação via OpenCage API
+└── email/                   # Envio de e-mails (Nodemailer)
 ```
-
-### Padrões por módulo
-
-Cada módulo de domínio (`tenants`, `users`, `trucks`, `jobs`, `trips`) segue a mesma estrutura:
-
-| Arquivo | Responsabilidade |
-|---|---|
-| `*.module.ts` | Configuração do módulo NestJS |
-| `*.controller.ts` | Rotas HTTP (endpoints) |
-| `*.service.ts` | Regras de negócio |
-| `entities/*.entity.ts` | Modelo de banco de dados (TypeORM) |
-| `dto/create-*.dto.ts` | Schema de criação (validação com class-validator) |
-| `dto/update-*.dto.ts` | Schema de atualização |
 
 ---
 
@@ -200,24 +191,35 @@ tenants (raiz)
 ## Fluxo de Uso
 
 ```
-1. Tenant se registra  →  POST /tenants/register
-2. Admin verifica e-mail  →  GET /users/verify-email?token=...
-3. Admin cadastra motoristas  →  POST /users
-4. Admin cadastra caminhões  →  POST /trucks
-5. Admin cria pedido de entrega  →  POST /jobs  (com coordenadas GPS)
-6. Admin cria viagem  →  POST /trips  (vincula job + truck + driver)
-7. Motorista envia localização  →  POST /tracking
-8. Clientes rastreiam em tempo real  →  WebSocket ou GET /trips/track/:token
+1. Tenant se registra         →  POST /api/tenants/register
+2. Admin verifica e-mail      →  GET  /api/users/verify-email?token=...
+3. Admin cadastra motoristas  →  POST /api/users
+4. Admin cadastra caminhões   →  POST /api/trucks  (incluindo gh_profile)
+5. Admin cria pedido          →  POST /api/jobs    (com coordenadas GPS)
+6. Admin cria viagem          →  POST /api/trips/create
+                                   └── GraphHopper calcula rota automaticamente
+7. Motorista envia localização →  POST /api/tracking
+8. Cliente rastreia entrega   →  GET  /api/trips/track/:token  (sem autenticação)
+                                   ou WebSocket (Socket.IO)
 ```
 
 ---
 
 ## Endpoints
 
+Base URL: `/api`
+
+### Autenticação
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/auth/login` | Pública | Login — retorna tokens (mobile) ou seta cookies (web) |
+| `POST` | `/auth/refresh` | JWT | Renova access e refresh tokens |
+| `POST` | `/auth/logout` | JWT | Limpa cookies de sessão |
+
 ### Tenants
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/tenants/register` | Registra empresa e cria admin |
+| `POST` | `/tenants/register` | Registra empresa e cria admin inicial |
 | `POST` | `/tenants` | Cria tenant |
 | `GET` | `/tenants` | Lista tenants |
 | `GET` | `/tenants/:id` | Busca tenant por ID |
@@ -227,8 +229,8 @@ tenants (raiz)
 ### Usuários
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/users` | Cria usuário (admin ou motorista) |
-| `GET` | `/users` | Lista usuários (filtro: `?tenant_id=`) |
+| `POST` | `/users` | Cria usuário |
+| `GET` | `/users` | Lista usuários do tenant |
 | `GET` | `/users/:id` | Busca usuário por ID |
 | `PATCH` | `/users/:id` | Atualiza usuário |
 | `DELETE` | `/users/:id` | Remove usuário |
@@ -238,7 +240,7 @@ tenants (raiz)
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/trucks` | Cadastra caminhão |
-| `GET` | `/trucks` | Lista caminhões (filtro: `?tenant_id=`) |
+| `GET` | `/trucks` | Lista caminhões do tenant |
 | `GET` | `/trucks/:id` | Busca caminhão por ID |
 | `PATCH` | `/trucks/:id` | Atualiza caminhão |
 | `DELETE` | `/trucks/:id` | Remove caminhão |
@@ -247,20 +249,20 @@ tenants (raiz)
 | Método | Rota | Descrição |
 |---|---|---|
 | `POST` | `/jobs` | Cria pedido de entrega |
-| `GET` | `/jobs` | Lista pedidos (filtro: `?tenant_id=`) |
+| `GET` | `/jobs` | Lista pedidos do tenant |
 | `GET` | `/jobs/:id` | Busca pedido por ID |
-| `PATCH` | `/jobs/:id` | Atualiza status do pedido |
+| `PATCH` | `/jobs/:id` | Atualiza pedido |
 | `DELETE` | `/jobs/:id` | Remove pedido |
 
 ### Viagens (Trips)
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/trips` | Cria viagem |
-| `GET` | `/trips` | Lista viagens com relações (filtro: `?tenant_id=`) |
-| `GET` | `/trips/:id` | Busca viagem por ID |
-| `GET` | `/trips/track/:token` | Rastreamento público (sem auth) |
-| `PATCH` | `/trips/:id` | Atualiza localização/status |
-| `DELETE` | `/trips/:id` | Remove viagem |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/trips/create` | ADMIN, USER | Cria viagem e calcula rota via GraphHopper |
+| `GET` | `/trips/all` | ADMIN, USER, DRIVER | Lista viagens do tenant |
+| `GET` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Busca viagem por ID |
+| `GET` | `/trips/track/:token` | Pública | Rastreamento público sem autenticação |
+| `PATCH` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Atualiza localização ou status |
+| `DELETE` | `/trips/trip/:id` | ADMIN | Remove viagem |
 
 ### Rastreamento
 | Método | Rota | Descrição |
@@ -268,10 +270,10 @@ tenants (raiz)
 | `POST` | `/tracking` | Envia atualização de localização GPS |
 
 ### WebSocket (Socket.IO)
-| Evento | Direção | Descrição |
-|---|---|---|
-| `join` | Cliente → Server | Entra na sala de rastreamento de uma entrega |
-| `location` | Server → Cliente | Emite localização `{ lat, lng }` em tempo real |
+| Evento | Direção | Payload | Descrição |
+|---|---|---|---|
+| `join` | Cliente → Server | `{ token: string }` | Entra na sala de rastreamento |
+| `location` | Server → Cliente | `{ lat, lng, updatedAt }` | Localização atualizada em tempo real |
 
 ---
 
@@ -288,25 +290,30 @@ pnpm run start:dev
 pnpm run start:prod
 ```
 
+> O banco deve ter a extensão **PostGIS** habilitada: `CREATE EXTENSION postgis;`
+
 ### Variáveis de Ambiente
 
 | Variável | Descrição |
 |---|---|
+| `PORT` | Porta da aplicação (padrão: `4001`) |
 | `DB_HOST` | Host do PostgreSQL |
 | `DB_PORT` | Porta do PostgreSQL |
 | `DB_USERNAME` | Usuário do banco |
 | `DB_PASSWORD` | Senha do banco |
 | `DB_DATABASE` | Nome do banco |
-| `EMAIL_HOST` | Host SMTP |
-| `EMAIL_USER` | Usuário SMTP |
-| `EMAIL_PASS` | Senha SMTP |
 | `JWT_SECRET` | Chave secreta para assinar tokens JWT |
 | `JWT_TTL` | Expiração do access token em segundos (padrão: `900`) |
 | `JWT_REFRESH_TTL` | Expiração do refresh token em segundos (padrão: `86400`) |
-| `PORT` | Porta da aplicação (padrão: `4001`) |
 | `FRONTEND_URL` | URL do frontend (CORS) |
-
-> O banco deve ter a extensão **PostGIS** habilitada: `CREATE EXTENSION postgis;`
+| `GRAPHHOPPER_BASE_URL` | Base URL da API GraphHopper (padrão: `https://graphhopper.com/api/1`) |
+| `GRAPHHOPPER_API_KEY` | Chave da API GraphHopper |
+| `OPENCAGE_API_URL` | URL da API OpenCage |
+| `OPENCAGE_API_KEY` | Chave da API OpenCage |
+| `EMAIL_HOST` | Host SMTP |
+| `EMAIL_USER` | Usuário SMTP |
+| `EMAIL_PASS` | Senha SMTP |
+| `EMAIL_FROM` | Remetente dos e-mails |
 
 ---
 
@@ -315,6 +322,9 @@ pnpm run start:prod
 ```bash
 # Unitários
 pnpm run test
+
+# Arquivo específico
+pnpm run test -- src/trips/trips.service.spec.ts
 
 # E2E
 pnpm run test:e2e
