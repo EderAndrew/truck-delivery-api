@@ -51,14 +51,14 @@ export class TenantsService {
       | undefined;
 
     try {
-      const stringAddress = `${dto.address_street}, ${dto.address_number}, ${dto.address_city}, ${dto.address_state}, ${dto.address_zip}, ${dto.country}`;
+      const stringAddress = `${dto.address_street}, ${dto.address_number}, ${dto.address_city}, ${dto.address_state}, ${dto.address_zip}, ${dto.address_country}`;
       const coords = await this.geocodingService.getCoordinates(stringAddress);
       origin_point = {
         type: 'Point',
         coordinates: [coords.longitude, coords.latitude],
       };
     } catch {
-      // geocoding falhou, tenant será criado sem origin_point
+      // ignored: tenant is created without origin_point if geocoding fails
     }
 
     const tenant = await this.tenantRepository.save(
@@ -72,7 +72,7 @@ export class TenantsService {
         address_city: dto.address_city,
         address_state: dto.address_state,
         address_zip: dto.address_zip,
-        country: dto.country,
+        address_country: dto.address_country,
         is_active: true,
         origin_point,
       }),

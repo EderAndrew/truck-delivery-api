@@ -48,7 +48,7 @@ export class Job {
   address_zip: string;
 
   @Column({ type: 'varchar', nullable: true })
-  country: string;
+  address_country: string;
 
   @Column({
     type: 'geometry',

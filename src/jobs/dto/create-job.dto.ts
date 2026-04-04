@@ -46,7 +46,7 @@ export class CreateJobDto {
 
   @IsString()
   @IsOptional()
-  country?: string;
+  address_country?: string;
 
   @ValidateNested()
   @Type(() => GeoPointDto)

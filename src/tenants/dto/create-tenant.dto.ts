@@ -8,7 +8,7 @@ import {
   Matches,
   ValidateNested,
 } from 'class-validator';
-import { GeoPointDto } from 'src/common/dto/geo-point.dto';
+import { GeoPointDto } from '../../common/dto/geo-point.dto.js';
 
 export class CreateTenantDto {
   @IsString()
@@ -52,7 +52,7 @@ export class CreateTenantDto {
 
   @IsString()
   @IsOptional()
-  country?: string;
+  address_country?: string;
 
   @IsBoolean()
   @IsOptional()

@@ -24,12 +24,12 @@ export class JobsService {
     let geocodedPoint: GeoPointDto | undefined;
 
     if (dto.address_street && dto.address_city) {
-      const stringAddress = `${dto.address_street}, ${dto.address_number}, ${dto.address_city}, ${dto.address_state}, ${dto.address_zip}, ${dto.country}`;
+      const stringAddress = `${dto.address_street}, ${dto.address_number}, ${dto.address_city}, ${dto.address_state}, ${dto.address_zip}, ${dto.address_country}`;
       try {
         geocodedPoint =
           await this.geocodingservice.getCoordinates(stringAddress);
       } catch {
-        // geocoding falhou, job será criado sem delivery_point
+        // ignored: job is created without delivery_point if geocoding fails
       }
     }
 

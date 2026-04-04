@@ -12,6 +12,7 @@ import { Job } from '../../jobs/entities/job.entity.js';
 import { Truck } from '../../trucks/entities/truck.entity.js';
 import { User } from '../../users/entities/user.entity.js';
 import { TripStatus } from '../../common/enums/trip-status.enum.js';
+import type { LineString, Point } from 'geojson';
 @Entity('trips')
 export class Trip {
   @PrimaryGeneratedColumn('uuid')
@@ -48,7 +49,7 @@ export class Trip {
     nullable: true,
   })
   @Index({ spatial: true })
-  route: object;
+  route: LineString;
 
   @Column({
     type: 'geometry',
@@ -57,7 +58,7 @@ export class Trip {
     nullable: true,
   })
   @Index({ spatial: true })
-  current_location: object;
+  current_location: Point;
 
   @Column({ type: 'timestamp', nullable: true })
   last_location_update: Date;

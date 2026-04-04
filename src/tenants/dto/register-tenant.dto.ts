@@ -9,10 +9,9 @@ import {
   IsOptional,
   ValidateNested,
 } from 'class-validator';
-import { GeoPointDto } from 'src/common/dto/geo-point.dto';
+import { GeoPointDto } from '../../common/dto/geo-point.dto.js';
 
 export class RegisterTenantDto {
-  // — Dados da empresa —
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -54,14 +53,13 @@ export class RegisterTenantDto {
 
   @IsString()
   @IsOptional()
-  country?: string;
+  address_country?: string;
 
   @ValidateNested()
   @Type(() => GeoPointDto)
   @IsOptional()
   origin_point?: GeoPointDto;
 
-  // — Dados do administrador —
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
