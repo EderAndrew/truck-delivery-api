@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import axios from 'axios';
 import type { LineString, Point } from 'geojson';
