@@ -1,29 +1,30 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import axios from 'axios';
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import opencage from 'opencage-api-client';
 
 @Injectable()
 export class GeocodingService {
-  private baseUrl = process.env.OPENCAGE_API_URL as string;
-
-  async getCoordinates(address: string) {
-    const response = await axios.get(this.baseUrl, {
-      params: {
-        q: address,
-        key: process.env.OPENCAGE_API_KEY,
-        limit: 1,
-      },
+  async getCoordinates(
+    address: string,
+  ): Promise<{ latitude: number; longitude: number }> {
+    const data = await opencage.geocode({
+      q: address,
+      no_annotations: 1,
+      limit: 1,
     });
 
-    const result = response.data.results[0];
-
-    if (!result) {
-      throw new Error('Endereço não encontrado');
+    if (data.status.code !== 200) {
+      throw new InternalServerErrorException(
+        `OpenCage error: ${data.status.message}`,
+      );
     }
 
-    return {
-      latitude: result.geometry.lat,
-      longitude: result.geometry.lng,
-    };
+    if (!data.total_results) {
+      throw new InternalServerErrorException('Endereço não encontrado');
+    }
+
+    const { lat, lng } = data.results[0].geometry;
+    return { latitude: lat, longitude: lng };
   }
 }
