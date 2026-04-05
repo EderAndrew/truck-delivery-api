@@ -21,12 +21,12 @@ export class JobsService {
   }
 
   async create(dto: CreateJobDto, tenant_id: string): Promise<Job> {
-    let geocodedPoint: GeoPointDto | undefined;
+    let geocodedDeliveryPoint: GeoPointDto | undefined;
 
-    if (dto.address_street && dto.address_city) {
+    if (!dto.delivery_point && dto.address_street && dto.address_city) {
       const stringAddress = `${dto.address_street}, ${dto.address_number}, ${dto.address_city}, ${dto.address_state}, ${dto.address_zip}, ${dto.address_country}`;
       try {
-        geocodedPoint =
+        geocodedDeliveryPoint =
           await this.geocodingservice.getCoordinates(stringAddress);
       } catch {
         // ignored: job is created without delivery_point if geocoding fails
@@ -39,10 +39,10 @@ export class JobsService {
       origin_point: dto.origin_point
         ? this.toGeoJsonPoint(dto.origin_point)
         : undefined,
-      delivery_point: geocodedPoint
-        ? this.toGeoJsonPoint(geocodedPoint)
-        : dto.delivery_point
-          ? this.toGeoJsonPoint(dto.delivery_point)
+      delivery_point: dto.delivery_point
+        ? this.toGeoJsonPoint(dto.delivery_point)
+        : geocodedDeliveryPoint
+          ? this.toGeoJsonPoint(geocodedDeliveryPoint)
           : undefined,
       scheduled_at: dto.scheduled_at ? new Date(dto.scheduled_at) : undefined,
     });

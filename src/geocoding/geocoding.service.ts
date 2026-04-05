@@ -1,14 +1,12 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
-import opencage from 'opencage-api-client';
+import { geocode } from 'opencage-api-client';
 
 @Injectable()
 export class GeocodingService {
   async getCoordinates(
     address: string,
   ): Promise<{ latitude: number; longitude: number }> {
-    const data = await opencage.geocode({
+    const data = await geocode({
       q: address,
       no_annotations: 1,
       limit: 1,
