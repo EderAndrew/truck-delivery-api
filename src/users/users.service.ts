@@ -6,7 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindAllUsersQueryDto } from './dto/find-all-users-query.dto.js';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto.js';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
@@ -68,11 +70,26 @@ export class UsersService {
     });
   }
 
-  findAll(tenant_id: string): Promise<User[]> {
-    return this.userRepository.find({
-      where: { tenant_id },
+  async findAll(
+    tenant_id: string,
+    query: FindAllUsersQueryDto,
+  ): Promise<PaginatedResponseDto<User>> {
+    const { page, limit, role, is_active } = query;
+    const skip = (page - 1) * limit;
+
+    const where: FindOptionsWhere<User> = { tenant_id };
+
+    if (role !== undefined) where.role = role;
+    if (is_active !== undefined) where.is_active = is_active;
+
+    const [data, total] = await this.userRepository.findAndCount({
+      where,
       order: { created_at: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string, tenant_id: string): Promise<User> {

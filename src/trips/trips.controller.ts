@@ -9,10 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TripsService } from './trips.service.js';
 import { CreateTripDto } from './dto/create-trip.dto.js';
 import { UpdateTripDto } from './dto/update-trip.dto.js';
+import { FindAllTripsQueryDto } from './dto/find-all-trips-query.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../common/enums/role.enum.js';
@@ -30,8 +32,11 @@ export class TripsController {
   }
 
   @Get('all')
-  findAll(@GetUser('tenant_id') tenantId: string) {
-    return this.tripsService.findAll(tenantId);
+  findAll(
+    @GetUser('tenant_id') tenantId: string,
+    @Query() query: FindAllTripsQueryDto,
+  ) {
+    return this.tripsService.findAll(tenantId, query);
   }
 
   @Public()

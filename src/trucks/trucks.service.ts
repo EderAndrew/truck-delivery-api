@@ -4,8 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { Truck } from './entities/truck.entity.js';
+import { FindAllTrucksQueryDto } from './dto/find-all-trucks-query.dto.js';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto.js';
 import { CreateTruckDto } from './dto/create-truck.dto.js';
 import { UpdateTruckDto } from './dto/update-truck.dto.js';
 
@@ -27,11 +29,25 @@ export class TrucksService {
     return this.truckRepository.save(truck);
   }
 
-  findAll(tenant_id?: string): Promise<Truck[]> {
-    return this.truckRepository.find({
-      where: { tenant_id },
+  async findAll(
+    tenant_id: string,
+    query: FindAllTrucksQueryDto,
+  ): Promise<PaginatedResponseDto<Truck>> {
+    const { page, limit, status } = query;
+    const skip = (page - 1) * limit;
+
+    const where: FindOptionsWhere<Truck> = { tenant_id };
+
+    if (status) where.status = status;
+
+    const [data, total] = await this.truckRepository.findAndCount({
+      where,
       order: { created_at: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string, tenant_id: string): Promise<Truck> {

@@ -9,10 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TrucksService } from './trucks.service.js';
 import { CreateTruckDto } from './dto/create-truck.dto.js';
 import { UpdateTruckDto } from './dto/update-truck.dto.js';
+import { FindAllTrucksQueryDto } from './dto/find-all-trucks-query.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../common/enums/role.enum.js';
 import { GetUser } from '../auth/decorators/get-user.decorator.js';
@@ -29,8 +31,11 @@ export class TrucksController {
 
   @Roles(Role.ADMIN, Role.USER)
   @Get('all')
-  findAll(@GetUser('tenant_id') tenantId: string) {
-    return this.trucksService.findAll(tenantId);
+  findAll(
+    @GetUser('tenant_id') tenantId: string,
+    @Query() query: FindAllTrucksQueryDto,
+  ) {
+    return this.trucksService.findAll(tenantId, query);
   }
 
   @Roles(Role.ADMIN, Role.USER)

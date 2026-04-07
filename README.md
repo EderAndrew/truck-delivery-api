@@ -217,63 +217,113 @@ Base URL: `/api`
 | `POST` | `/auth/logout` | JWT | Limpa cookies de sessão |
 
 ### Tenants
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/tenants/register` | Registra empresa e cria admin inicial |
-| `POST` | `/tenants` | Cria tenant |
-| `GET` | `/tenants` | Lista tenants |
-| `GET` | `/tenants/:id` | Busca tenant por ID |
-| `PATCH` | `/tenants/:id` | Atualiza tenant |
-| `DELETE` | `/tenants/:id` | Remove tenant e todos os dados |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/tenants/register` | Pública | Registra empresa e cria admin inicial |
+| `GET` | `/tenants/tenants` | ADMIN | Lista todos os tenants |
+| `GET` | `/tenants/myTenant/:id` | ADMIN | Busca tenant por ID |
+| `PATCH` | `/tenants/update/:id` | ADMIN | Atualiza tenant |
+| `DELETE` | `/tenants/remove/:id` | ADMIN | Remove tenant e todos os dados |
+
+**Filtros disponíveis:** `?page=1&limit=20&is_active=true`
 
 ### Usuários
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/users` | Cria usuário |
-| `GET` | `/users` | Lista usuários do tenant |
-| `GET` | `/users/:id` | Busca usuário por ID |
-| `PATCH` | `/users/:id` | Atualiza usuário |
-| `DELETE` | `/users/:id` | Remove usuário |
-| `GET` | `/users/verify-email` | Verifica e-mail via token |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `GET` | `/users/verify-email?token=` | Pública | Verifica e-mail via token |
+| `POST` | `/users/create` | ADMIN | Cria usuário (envia senha temporária por e-mail) |
+| `GET` | `/users/me` | Qualquer | Retorna o usuário autenticado |
+| `GET` | `/users/all` | ADMIN | Lista usuários do tenant |
+| `GET` | `/users/user/:id` | ADMIN | Busca usuário por ID |
+| `PATCH` | `/users/user/:id` | ADMIN | Atualiza usuário |
+| `DELETE` | `/users/user/:id` | ADMIN | Remove usuário |
+
+**Filtros disponíveis:** `?page=1&limit=20&role=DRIVER&is_active=true`
 
 ### Caminhões
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/trucks` | Cadastra caminhão |
-| `GET` | `/trucks` | Lista caminhões do tenant |
-| `GET` | `/trucks/:id` | Busca caminhão por ID |
-| `PATCH` | `/trucks/:id` | Atualiza caminhão |
-| `DELETE` | `/trucks/:id` | Remove caminhão |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/trucks/create` | ADMIN | Cadastra caminhão |
+| `GET` | `/trucks/all` | ADMIN, USER | Lista caminhões do tenant |
+| `GET` | `/trucks/truck/:id` | ADMIN, USER | Busca caminhão por ID |
+| `PATCH` | `/trucks/truck/:id` | ADMIN | Atualiza caminhão |
+| `DELETE` | `/trucks/truck/:id` | ADMIN | Remove caminhão |
+
+**Filtros disponíveis:** `?page=1&limit=20&status=AVAILABLE`
+
+Status: `AVAILABLE` \| `ON_TRIP` \| `IN_MAINTENANCE`
 
 ### Pedidos (Jobs)
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/jobs` | Cria pedido de entrega |
-| `GET` | `/jobs` | Lista pedidos do tenant |
-| `GET` | `/jobs/:id` | Busca pedido por ID |
-| `PATCH` | `/jobs/:id` | Atualiza pedido |
-| `DELETE` | `/jobs/:id` | Remove pedido |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/jobs/create` | ADMIN, USER | Cria pedido de entrega (geocodifica endereço automaticamente se sem coordenadas) |
+| `GET` | `/jobs/all` | ADMIN, USER | Lista pedidos do tenant |
+| `GET` | `/jobs/job/:id` | ADMIN, USER | Busca pedido por ID |
+| `PATCH` | `/jobs/job/:id` | ADMIN, USER | Atualiza pedido |
+| `DELETE` | `/jobs/job/:id` | ADMIN, USER | Remove pedido |
+
+**Filtros disponíveis:** `?page=1&limit=20&status=PENDING&customer_name=acme&from=2026-01-01&to=2026-12-31`
+
+Status: `PENDING` \| `SCHEDULED` \| `IN_PROGRESS` \| `COMPLETED` \| `CANCELED`
 
 ### Viagens (Trips)
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | `POST` | `/trips/create` | ADMIN, USER | Cria viagem e calcula rota via GraphHopper |
-| `GET` | `/trips/all` | ADMIN, USER, DRIVER | Lista viagens do tenant |
-| `GET` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Busca viagem por ID |
+| `GET` | `/trips/all` | ADMIN, USER, DRIVER | Lista viagens do tenant (inclui job, truck, driver) |
 | `GET` | `/trips/track/:token` | Pública | Rastreamento público sem autenticação |
-| `PATCH` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Atualiza localização ou status |
+| `GET` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Busca viagem por ID |
+| `PATCH` | `/trips/trip/:id` | ADMIN, USER, DRIVER | Atualiza localização ou status (emite via WebSocket) |
 | `DELETE` | `/trips/trip/:id` | ADMIN | Remove viagem |
 
+**Filtros disponíveis:** `?page=1&limit=20&status=STARTED&driver_id=<uuid>&truck_id=<uuid>`
+
+Status: `PLANNED` \| `STARTED` \| `COMPLETED` \| `CANCELED`
+
 ### Rastreamento
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/tracking` | Envia atualização de localização GPS |
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `POST` | `/tracking` | DRIVER | Envia atualização de localização GPS |
 
 ### WebSocket (Socket.IO)
 | Evento | Direção | Payload | Descrição |
 |---|---|---|---|
-| `join` | Cliente → Server | `{ token: string }` | Entra na sala de rastreamento |
+| `join` | Cliente → Server | `token` (string) | Entra na sala de rastreamento via `public_tracking_token` |
 | `location` | Server → Cliente | `{ lat, lng, updatedAt }` | Localização atualizada em tempo real |
+
+---
+
+## Paginação e Filtros
+
+Todos os endpoints de listagem suportam paginação via query params. Se omitidos, os padrões são aplicados.
+
+| Param | Tipo | Padrão | Máximo | Descrição |
+|---|---|---|---|---|
+| `page` | inteiro | `1` | — | Página atual |
+| `limit` | inteiro | `20` | `100` | Resultados por página |
+
+**Formato de resposta:**
+
+```json
+{
+  "data": [...],
+  "total": 142,
+  "page": 2,
+  "limit": 20
+}
+```
+
+`total` é a contagem completa considerando os filtros aplicados. Para calcular o número de páginas: `Math.ceil(total / limit)`.
+
+**Exemplos:**
+
+```
+GET /api/jobs/all?page=2&limit=10&status=PENDING&from=2026-01-01
+GET /api/trips/all?status=STARTED&driver_id=<uuid>
+GET /api/trucks/all?status=AVAILABLE
+GET /api/users/all?role=DRIVER&is_active=false
+GET /api/tenants/tenants?is_active=true&limit=50
+```
 
 ---
 

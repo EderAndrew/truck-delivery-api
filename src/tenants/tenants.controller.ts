@@ -9,10 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { TenantsService } from './tenants.service.js';
 import { UpdateTenantDto } from './dto/update-tenant.dto.js';
 import { RegisterTenantDto } from './dto/register-tenant.dto.js';
+import { FindAllTenantsQueryDto } from './dto/find-all-tenants-query.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../common/enums/role.enum.js';
@@ -30,8 +32,8 @@ export class TenantsController {
   }
 
   @Get('tenants')
-  findAll() {
-    return this.tenantsService.findAll();
+  findAll(@Query() query: FindAllTenantsQueryDto) {
+    return this.tenantsService.findAll(query);
   }
 
   @Get('myTenant/:id')

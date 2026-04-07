@@ -1,7 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {
+  Between,
+  FindOptionsWhere,
+  ILike,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  Repository,
+} from 'typeorm';
 import { Job } from './entities/job.entity.js';
+import { FindAllJobsQueryDto } from './dto/find-all-jobs-query.dto.js';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto.js';
 import { CreateJobDto } from './dto/create-job.dto.js';
 import { UpdateJobDto } from './dto/update-job.dto.js';
 import { GeoJsonPoint } from '../common/types/geo.types.js';
@@ -49,11 +58,29 @@ export class JobsService {
     return this.jobRepository.save(job);
   }
 
-  findAll(tenant_id?: string): Promise<Job[]> {
-    return this.jobRepository.find({
-      where: { tenant_id },
+  async findAll(
+    tenant_id: string,
+    query: FindAllJobsQueryDto,
+  ): Promise<PaginatedResponseDto<Job>> {
+    const { page, limit, status, from, to, customer_name } = query;
+    const skip = (page - 1) * limit;
+
+    const where: FindOptionsWhere<Job> = { tenant_id };
+
+    if (status) where.status = status;
+    if (customer_name) where.customer_name = ILike(`%${customer_name}%`);
+    if (from && to) where.scheduled_at = Between(new Date(from), new Date(to));
+    else if (from) where.scheduled_at = MoreThanOrEqual(new Date(from));
+    else if (to) where.scheduled_at = LessThanOrEqual(new Date(to));
+
+    const [data, total] = await this.jobRepository.findAndCount({
+      where,
       order: { scheduled_at: 'ASC' },
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string, tenant_id: string): Promise<Job> {

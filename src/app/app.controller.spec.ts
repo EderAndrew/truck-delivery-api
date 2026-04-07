@@ -16,7 +16,7 @@ describe('AppController', () => {
 
   describe('root', () => {
     it('should return "Pong"', () => {
-      expect(appController.ping()).toBe('Pong');
+      expect(appController.ping()).toEqual({ message: 'Pong' });
     });
   });
 });

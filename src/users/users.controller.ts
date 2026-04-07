@@ -15,6 +15,7 @@ import {
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { FindAllUsersQueryDto } from './dto/find-all-users-query.dto.js';
 import { Public } from '../auth/decorators/public.decorator.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../common/enums/role.enum.js';
@@ -43,8 +44,11 @@ export class UsersController {
   }
 
   @Get('all')
-  findAll(@GetUser('tenant_id') tenantId: string) {
-    return this.usersService.findAll(tenantId);
+  findAll(
+    @GetUser('tenant_id') tenantId: string,
+    @Query() query: FindAllUsersQueryDto,
+  ) {
+    return this.usersService.findAll(tenantId, query);
   }
 
   @Get('user/:id')

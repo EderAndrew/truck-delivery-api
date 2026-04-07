@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindAllTripsQueryDto } from './dto/find-all-trips-query.dto.js';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { LineString } from 'geojson';
 import { Trip } from './entities/trip.entity.js';
@@ -83,12 +85,28 @@ export class TripsService {
     return this.tripRepository.save(trip);
   }
 
-  findAll(tenant_id?: string): Promise<Trip[]> {
-    return this.tripRepository.find({
-      where: { tenant_id },
+  async findAll(
+    tenant_id: string,
+    query: FindAllTripsQueryDto,
+  ): Promise<PaginatedResponseDto<Trip>> {
+    const { page, limit, status, driver_id, truck_id } = query;
+    const skip = (page - 1) * limit;
+
+    const where: FindOptionsWhere<Trip> = { tenant_id };
+
+    if (status) where.status = status;
+    if (driver_id) where.driver_id = driver_id;
+    if (truck_id) where.truck_id = truck_id;
+
+    const [data, total] = await this.tripRepository.findAndCount({
+      where,
       order: { created_at: 'DESC' },
       relations: ['job', 'truck', 'driver'],
+      skip,
+      take: limit,
     });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string, tenant_id: string): Promise<Trip> {

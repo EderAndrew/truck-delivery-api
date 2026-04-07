@@ -9,10 +9,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { JobsService } from './jobs.service.js';
 import { CreateJobDto } from './dto/create-job.dto.js';
 import { UpdateJobDto } from './dto/update-job.dto.js';
+import { FindAllJobsQueryDto } from './dto/find-all-jobs-query.dto.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { Role } from '../common/enums/role.enum.js';
 import { GetUser } from '../auth/decorators/get-user.decorator.js';
@@ -28,8 +30,11 @@ export class JobsController {
   }
 
   @Get('all')
-  findAll(@GetUser('tenant_id') tenantId: string) {
-    return this.jobsService.findAll(tenantId);
+  findAll(
+    @GetUser('tenant_id') tenantId: string,
+    @Query() query: FindAllJobsQueryDto,
+  ) {
+    return this.jobsService.findAll(tenantId, query);
   }
 
   @Get('job/:id')

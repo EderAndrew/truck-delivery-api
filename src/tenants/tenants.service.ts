@@ -4,7 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindAllTenantsQueryDto } from './dto/find-all-tenants-query.dto.js';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto.js';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { Tenant } from './entities/tenant.entity.js';
@@ -117,8 +119,24 @@ export class TenantsService {
     return { tenant, user };
   }
 
-  findAll(): Promise<Tenant[]> {
-    return this.tenantRepository.find({ order: { created_at: 'DESC' } });
+  async findAll(
+    query: FindAllTenantsQueryDto,
+  ): Promise<PaginatedResponseDto<Tenant>> {
+    const { page, limit, is_active } = query;
+    const skip = (page - 1) * limit;
+
+    const where: FindOptionsWhere<Tenant> = {};
+
+    if (is_active !== undefined) where.is_active = is_active;
+
+    const [data, total] = await this.tenantRepository.findAndCount({
+      where,
+      order: { created_at: 'DESC' },
+      skip,
+      take: limit,
+    });
+
+    return new PaginatedResponseDto(data, total, page, limit);
   }
 
   async findOne(id: string): Promise<Tenant> {
